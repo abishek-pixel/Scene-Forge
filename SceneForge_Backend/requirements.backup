@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+databases[sqlite]
+pydantic
+alembic
+celery[redis]
+redis
+transformers
+torch

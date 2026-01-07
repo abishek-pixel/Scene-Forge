@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+databases[sqlite]
+pydantic
+alembic
+celery[redis]
+redis
+transformers
+transformers
+numpy<2
+pydantic-settings
+torch==2.2.0+cpu
+Pillow
