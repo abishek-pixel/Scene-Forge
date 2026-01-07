@@ -1,6 +1,5 @@
 import type { Metadata } from "next"
 import { Geist } from "next/font/google"
-import { Analytics } from "@vercel/analytics/next"
 import { UserProvider } from "@/lib/user-context"
 import { AuthProvider } from "@/lib/auth-context"
 import "./globals.css"
