@@ -1,13 +1,13 @@
-FROM python:3.10-slim
+FROM python:3.10
 
 WORKDIR /app
 
 # Copy backend requirements
-COPY SceneForge_Backend/requirements.txt .
+COPY SceneForge_Backend/requirements-prod.txt .
 
 # Install Python dependencies
-ENV PIP_DEFAULT_TIMEOUT=120
-RUN pip install --no-cache-dir -r requirements.txt
+ENV PIP_DEFAULT_TIMEOUT=180
+RUN pip install --no-cache-dir -r requirements-prod.txt
 
 # Copy the entire backend code
 COPY SceneForge_Backend/app ./app
