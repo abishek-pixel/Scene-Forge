@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import auth, scenes, processing
+from app.api import auth, scenes
 
 app = FastAPI(title="SceneForge API")
 
@@ -21,7 +21,6 @@ app.add_middleware(
 # Include routers
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(scenes.router, prefix="/scenes", tags=["scenes"])
-app.include_router(processing.router, prefix="/processing", tags=["processing"])
 
 @app.get("/health")
 async def health_check():
