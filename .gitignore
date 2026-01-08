@@ -10,7 +10,6 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
 lib64/
 parts/
 sdist/
@@ -49,6 +48,10 @@ node_modules/
 out/
 dist/
 build/
+
+# Keep Next.js lib folder - explicitly include
+!sceneforge-frontend\ -\ final/lib/
+!sceneforge-frontend\ -\ final/lib/**
 
 # Test outputs
 test_outputs/
