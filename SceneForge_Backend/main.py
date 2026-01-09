@@ -11,12 +11,13 @@ app.add_middleware(
         "http://localhost:3000",  # Local development
         "http://localhost:5173",  # Vite dev
         "https://scene-forge-app-abhishek-kamthes-projects.vercel.app",  # Old Vercel URL
-        "https://scene-forge-bfcuwj0tv-abhishek-kamthes-projects.vercel.app",  # Current Vercel production
+        "https://scene-forge-bfcuwj0tv-abhishek-kamthes-projects.vercel.app",  # Previous Vercel URL
+        "https://scene-forge-pfmmhe923-abhishek-kamthes-projects.vercel.app",  # Current Vercel URL
         "http://localhost:8000",  # Local backend
     ],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 # Include routers
