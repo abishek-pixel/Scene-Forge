@@ -10,8 +10,9 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",  # Local development
         "http://localhost:5173",  # Vite dev
-        "https://scene-forge-app-abhishek-kamthes-projects.vercel.app",  # Vercel production
-        "https://*.vercel.app",  # All Vercel deployments
+        "https://scene-forge-app-abhishek-kamthes-projects.vercel.app",  # Old Vercel URL
+        "https://scene-forge-bfcuwj0tv-abhishek-kamthes-projects.vercel.app",  # Current Vercel production
+        "http://localhost:8000",  # Local backend
     ],
     allow_credentials=True,
     allow_methods=["*"],
