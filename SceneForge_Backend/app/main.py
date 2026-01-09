@@ -14,14 +14,17 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",  # Local development
         "http://localhost:5173",  # Vite dev
-        "https://scene-forge-app-abhishek-kamthes-projects.vercel.app",  # Vercel production
-        "https://*.vercel.app",  # All Vercel deployments
+        "https://scene-forge-app-abhishek-kamthes-projects.vercel.app",  # Old Vercel URL
+        "https://scene-forge-bfcuwj0tv-abhishek-kamthes-projects.vercel.app",  # Previous Vercel URL
+        "https://scene-forge-pfmmhe923-abhishek-kamthes-projects.vercel.app",  # Earlier Vercel URL
+        "https://scene-forge-7hi4yt9jy-abhishek-kamthes-projects.vercel.app",  # CURRENT Vercel URL
+        "http://localhost:8000",  # Local backend
     ],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],  # Explicitly list methods
-    allow_headers=["*"],  # Allow all headers
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=["Content-Type", "Authorization"],
     expose_headers=["*"],
-    max_age=3600,  # Cache preflight for 1 hour
+    max_age=3600,
 )
 
 # Add this before the router to ensure the root endpoint works
