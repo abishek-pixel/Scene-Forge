@@ -48,6 +48,7 @@ node_modules/
 out/
 dist/
 build/
+pnpm-lock.yaml
 
 # Keep Next.js lib folder - explicitly include
 !sceneforge-frontend\ -\ final/lib/
