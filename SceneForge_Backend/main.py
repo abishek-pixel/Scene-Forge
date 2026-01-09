@@ -12,7 +12,8 @@ app.add_middleware(
         "http://localhost:5173",  # Vite dev
         "https://scene-forge-app-abhishek-kamthes-projects.vercel.app",  # Old Vercel URL
         "https://scene-forge-bfcuwj0tv-abhishek-kamthes-projects.vercel.app",  # Previous Vercel URL
-        "https://scene-forge-pfmmhe923-abhishek-kamthes-projects.vercel.app",  # Current Vercel URL
+        "https://scene-forge-pfmmhe923-abhishek-kamthes-projects.vercel.app",  # Earlier Vercel URL
+        "https://scene-forge-7hi4yt9jy-abhishek-kamthes-projects.vercel.app",  # CURRENT Vercel URL
         "http://localhost:8000",  # Local backend
     ],
     allow_credentials=True,
