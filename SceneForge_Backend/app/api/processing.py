@@ -9,6 +9,9 @@ from pathlib import Path
 import aiofiles
 from ..core.services.processing_service import ProcessingService
 import urllib.parse
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 processing_service = ProcessingService()
@@ -156,6 +159,7 @@ async def process_files(job_id: str, file_paths: List[str], prompt: str, scene_n
             job.status = "failed"
             job.message = str(e)
             job.updatedAt = datetime.now()
+        logger.error(f"Processing task {job_id} failed: {str(e)}", exc_info=True)
 
 @router.get("/tasks")
 async def list_processing_tasks():
