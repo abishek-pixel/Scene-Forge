@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import auth, scenes
+from app.api import auth, scenes, processing
 from app.core.logger import setup_logging
 from app.core.config import settings
 
@@ -49,3 +49,4 @@ async def health_check():
 # Include API routers
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(scenes.router, prefix="/scenes", tags=["scenes"])
+app.include_router(processing.router, prefix="/processing", tags=["processing"])
