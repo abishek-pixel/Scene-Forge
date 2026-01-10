@@ -7,20 +7,11 @@ import asyncio
 import gc
 import logging
 
-# Lazy imports for optional dependencies
-def _import_pil():
-    try:
-        from PIL import Image
-        return Image
-    except ImportError:
-        return None
+# Core imports (lightweight, essential for type hints and basic operations)
+import numpy as np
+from PIL import Image
 
-def _import_numpy():
-    try:
-        import numpy as np
-        return np
-    except ImportError:
-        return None
+# Lazy imports for optional/heavy dependencies
 
 def _import_cv2():
     try:
