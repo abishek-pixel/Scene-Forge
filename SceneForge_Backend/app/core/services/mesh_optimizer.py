@@ -12,10 +12,23 @@ Features:
 """
 
 import numpy as np
-import open3d as o3d
 import logging
 from typing import Tuple, Optional
-import trimesh
+
+# Lazy imports for optional dependencies
+def _import_o3d():
+    try:
+        import open3d as o3d
+        return o3d
+    except ImportError:
+        return None
+
+def _import_trimesh():
+    try:
+        import trimesh
+        return trimesh
+    except ImportError:
+        return None
 
 logger = logging.getLogger(__name__)
 

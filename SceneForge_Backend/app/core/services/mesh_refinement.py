@@ -4,9 +4,16 @@ Addresses noise, smoothness, and visual quality issues
 """
 
 import numpy as np
-import open3d as o3d
 from typing import Tuple, Optional
 import logging
+
+# Lazy import for optional dependency
+def _import_o3d():
+    try:
+        import open3d as o3d
+        return o3d
+    except ImportError:
+        return None
 
 logger = logging.getLogger(__name__)
 

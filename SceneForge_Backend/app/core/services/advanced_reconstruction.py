@@ -6,11 +6,24 @@ Advanced 3D Reconstruction Techniques:
 """
 
 import numpy as np
-import open3d as o3d
 from typing import List, Tuple, Optional, Dict, Any
 import logging
 from pathlib import Path
-import cv2
+
+# Lazy imports for optional dependencies
+def _import_o3d():
+    try:
+        import open3d as o3d
+        return o3d
+    except ImportError:
+        return None
+
+def _import_cv2():
+    try:
+        import cv2
+        return cv2
+    except ImportError:
+        return None
 
 logger = logging.getLogger(__name__)
 

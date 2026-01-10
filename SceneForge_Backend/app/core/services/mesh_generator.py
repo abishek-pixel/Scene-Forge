@@ -4,8 +4,6 @@ Handles point cloud creation, mesh generation, and cleaning.
 """
 
 import numpy as np
-import open3d as o3d
-import cv2
 import os
 from typing import Dict, Any, Tuple, Optional, List
 from pathlib import Path
@@ -13,6 +11,21 @@ import json
 from PIL import Image
 import logging
 import gc
+
+# Lazy imports for optional dependencies
+def _import_o3d():
+    try:
+        import open3d as o3d
+        return o3d
+    except ImportError:
+        return None
+
+def _import_cv2():
+    try:
+        import cv2
+        return cv2
+    except ImportError:
+        return None
 
 logger = logging.getLogger(__name__)
 
