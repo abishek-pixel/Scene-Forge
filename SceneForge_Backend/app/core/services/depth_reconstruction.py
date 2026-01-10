@@ -138,11 +138,11 @@ class DepthReconstructionPipeline:
     
     def create_mesh_from_depth(self, depth_map: np.ndarray, image: Image.Image) -> object:
         """
-        Create 3D mesh from depth map using point cloud + Poisson reconstruction
+        Create 3D mesh from depth map using height field
         
         Args:
-            depth_map: Depth map
-            image: Original RGB image for coloring
+            depth_map: Depth map (normalized 0-1)
+            image: Original RGB image for reference
             
         Returns:
             trimesh.Trimesh object
@@ -151,50 +151,52 @@ class DepthReconstructionPipeline:
         import trimesh
         
         try:
-            # Get point cloud
-            points = self.depth_to_point_cloud(depth_map, image)
-            
-            # Downsample for faster processing
-            if len(points) > 50000:
-                logger.info(f"Downsampling point cloud from {len(points)} to 50000 points")
-                indices = np.random.choice(len(points), 50000, replace=False)
-                points = points[indices]
-            
-            # Create simple mesh from depth map (height field)
             h, w = depth_map.shape
+            logger.info(f"Depth map shape: {h}x{w}")
             
-            # Scale depth to height
-            heights = (depth_map * 2).astype(np.float32)
+            # Ensure depth map is properly normalized
+            if depth_map.max() > 1.0:
+                depth_map = depth_map / depth_map.max()
             
-            # Create mesh from vertices and faces
+            # Scale depth to height (0.1 to 5 units)
+            heights = 0.1 + depth_map * 4.9
+            logger.info(f"Height range: {heights.min():.3f} to {heights.max():.3f}")
+            
+            # Create vertices from height map
             vertices = []
-            faces = []
+            for i in range(h):
+                for j in range(w):
+                    vertices.append([j / w, i / h, heights[i, j]])
             
+            vertices = np.array(vertices, dtype=np.float32)
+            logger.info(f"Created {len(vertices)} vertices")
+            
+            # Create faces (triangles) from quad grid
+            faces = []
             for i in range(h - 1):
                 for j in range(w - 1):
-                    # Get 4 corners of quad
-                    v1 = np.array([j, i, heights[i, j]])
-                    v2 = np.array([j + 1, i, heights[i, j + 1]])
-                    v3 = np.array([j + 1, i + 1, heights[i + 1, j + 1]])
-                    v4 = np.array([j, i + 1, heights[i + 1, j]])
-                    
-                    idx_start = len(vertices)
-                    vertices.extend([v1, v2, v3, v4])
+                    # Current quad corners
+                    v0 = i * w + j
+                    v1 = i * w + (j + 1)
+                    v2 = (i + 1) * w + (j + 1)
+                    v3 = (i + 1) * w + j
                     
                     # Two triangles per quad
-                    faces.append([idx_start, idx_start + 1, idx_start + 2])
-                    faces.append([idx_start, idx_start + 2, idx_start + 3])
+                    faces.append([v0, v1, v2])
+                    faces.append([v0, v2, v3])
             
-            vertices = np.array(vertices)
-            faces = np.array(faces)
+            faces = np.array(faces, dtype=np.uint32)
+            logger.info(f"Created {len(faces)} faces")
             
             # Create mesh
             mesh = trimesh.Trimesh(vertices=vertices, faces=faces)
-            
-            # Smooth mesh
-            mesh = self._smooth_mesh(mesh)
-            
             logger.info(f"✓ Mesh created: {len(mesh.vertices)} vertices, {len(mesh.faces)} faces")
+            
+            # Basic validation
+            if not mesh.is_valid:
+                logger.warning("Mesh is not valid, attempting to fix...")
+                mesh.remove_degenerate_faces()
+                mesh.remove_infinite_values()
             
             return mesh
             
@@ -226,7 +228,7 @@ class DepthReconstructionPipeline:
     
     def process_image_to_3d(self, image_path: str, output_path: str) -> Tuple[str, dict]:
         """
-        Complete pipeline: Image -> Depth -> Point Cloud -> Mesh -> GLB
+        Complete pipeline: Image -> Depth -> Mesh -> GLB
         
         Args:
             image_path: Path to input image
@@ -235,40 +237,71 @@ class DepthReconstructionPipeline:
         Returns:
             Tuple of (output_file_path, metadata)
         """
+        import time
+        start_time = time.time()
         logger.info(f"Starting 3D reconstruction pipeline for {image_path}")
         
         try:
             # Load original image
+            logger.info("Loading image...")
             img_pil = Image.open(image_path)
+            img_pil.verify()
+            img_pil = Image.open(image_path)  # Re-open after verify
+            logger.info(f"✓ Image loaded: {img_pil.size}")
             
             # Estimate depth
+            logger.info("Estimating depth map...")
+            depth_start = time.time()
             depth_map = self.estimate_depth(image_path)
+            logger.info(f"✓ Depth estimation complete in {time.time() - depth_start:.2f}s")
             
             # Create mesh from depth
+            logger.info("Converting depth to 3D mesh...")
+            mesh_start = time.time()
             mesh = self.create_mesh_from_depth(depth_map, img_pil)
+            logger.info(f"✓ Mesh creation complete in {time.time() - mesh_start:.2f}s")
             
             # Export to GLB
-            output_file = str(output_path)
-            logger.info(f"Exporting to {output_file}")
-            mesh.export(output_file)
+            logger.info(f"Exporting to GLB: {output_path}")
+            export_start = time.time()
+            
+            # Ensure output directory exists
+            Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+            
+            # Export with error checking
+            try:
+                mesh.export(output_path)
+            except Exception as e:
+                logger.warning(f"GLB export failed: {e}, trying with file_type parameter...")
+                mesh.export(output_path, file_type='glb')
+            
+            logger.info(f"✓ Export complete in {time.time() - export_start:.2f}s")
             
             # Verify file
-            if not Path(output_file).exists():
-                raise Exception(f"Failed to create output file: {output_file}")
+            if not Path(output_path).exists():
+                raise Exception(f"Failed to create output file: {output_path}")
             
-            file_size = Path(output_file).stat().st_size
-            logger.info(f"✓ Model exported: {output_file} ({file_size} bytes)")
+            file_size = Path(output_path).stat().st_size
+            if file_size == 0:
+                raise Exception(f"Output file is empty: {output_path}")
+            
+            total_time = time.time() - start_time
+            logger.info(f"✓ 3D reconstruction complete in {total_time:.2f}s")
+            logger.info(f"  - File: {output_path}")
+            logger.info(f"  - Size: {file_size / 1024:.1f} KB")
+            logger.info(f"  - Vertices: {len(mesh.vertices)}, Faces: {len(mesh.faces)}")
             
             metadata = {
                 "input_file": Path(image_path).name,
-                "output_file": output_file,
+                "output_file": output_path,
                 "vertices": len(mesh.vertices),
                 "faces": len(mesh.faces),
                 "file_size_bytes": file_size,
+                "processing_time_seconds": total_time,
                 "reconstruction_method": "MiDaS Depth + Height Field Mesh"
             }
             
-            return output_file, metadata
+            return output_path, metadata
             
         except Exception as e:
             logger.error(f"3D reconstruction failed: {e}", exc_info=True)
