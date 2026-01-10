@@ -21,14 +21,14 @@ passlib[bcrypt]>=1.7.4
 
 # Image processing
 Pillow>=10.0.0
-opencv-python-headless>=4.8.0
+# opencv-python-headless>=4.8.0
 imageio[pyav]>=2.25.0
 numpy>=1.24.0
 
 # 3D processing
 trimesh>=4.0.0
 numpy-stl>=3.0.0
-meshio>=5.3.4
+# meshio>=5.3.4
 
 # Deep learning models (DISABLED for Render)
 # timm>=0.9.0
@@ -37,7 +37,7 @@ meshio>=5.3.4
 
 # Visualization
 matplotlib>=3.7.0
-scikit-image>=0.21.0
+# scikit-image>=0.21.0
 
 # Point cloud processing (DISABLED for Render - git install fails)
 # point-e @ git+https://github.com/openai/point-e.git
