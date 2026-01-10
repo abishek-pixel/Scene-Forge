@@ -1,24 +1,104 @@
 import os
-from PIL import Image
-import numpy as np
 from pathlib import Path
 from typing import List, Optional, Dict, Any, Tuple
 import json
 from datetime import datetime
 import asyncio
 import gc
-from .ai_processor import AIProcessor
-from .mesh_generator import MeshGenerator
-from .segmentation import SemanticSegmenter, SimpleSegmenter
-from .camera_pose import CameraPoseEstimator
-from .advanced_reconstruction import AdvancedReconstructionPipeline
-from .mesh_refinement import MeshRefinement, EdgePreservation
-from .structure_from_motion import StructureFromMotion, get_sfm_estimator
-from .smart_frame_sampler import SmartFrameSampler
-from .mesh_optimizer import MeshOptimizer
 import logging
-import cv2
-import open3d as o3d
+
+# Lazy imports for optional dependencies
+def _import_pil():
+    try:
+        from PIL import Image
+        return Image
+    except ImportError:
+        return None
+
+def _import_numpy():
+    try:
+        import numpy as np
+        return np
+    except ImportError:
+        return None
+
+def _import_cv2():
+    try:
+        import cv2
+        return cv2
+    except ImportError:
+        return None
+
+def _import_o3d():
+    try:
+        import open3d as o3d
+        return o3d
+    except ImportError:
+        return None
+
+def _import_ai_processor():
+    try:
+        from .ai_processor import AIProcessor
+        return AIProcessor
+    except ImportError:
+        return None
+
+def _import_mesh_generator():
+    try:
+        from .mesh_generator import MeshGenerator
+        return MeshGenerator
+    except ImportError:
+        return None
+
+def _import_segmentation():
+    try:
+        from .segmentation import SemanticSegmenter, SimpleSegmenter
+        return SemanticSegmenter, SimpleSegmenter
+    except ImportError:
+        return None, None
+
+def _import_camera_pose():
+    try:
+        from .camera_pose import CameraPoseEstimator
+        return CameraPoseEstimator
+    except ImportError:
+        return None
+
+def _import_advanced_reconstruction():
+    try:
+        from .advanced_reconstruction import AdvancedReconstructionPipeline
+        return AdvancedReconstructionPipeline
+    except ImportError:
+        return None
+
+def _import_mesh_refinement():
+    try:
+        from .mesh_refinement import MeshRefinement, EdgePreservation
+        return MeshRefinement, EdgePreservation
+    except ImportError:
+        return None, None
+
+def _import_sfm():
+    try:
+        from .structure_from_motion import StructureFromMotion, get_sfm_estimator
+        return StructureFromMotion, get_sfm_estimator
+    except ImportError:
+        return None, None
+
+def _import_frame_sampler():
+    try:
+        from .smart_frame_sampler import SmartFrameSampler
+        return SmartFrameSampler
+    except ImportError:
+        return None
+
+def _import_mesh_optimizer():
+    try:
+        from .mesh_optimizer import MeshOptimizer
+        return MeshOptimizer
+    except ImportError:
+        return None
+
 try:
     import imageio
     HAS_IMAGEIO = True
@@ -33,41 +113,80 @@ class ProcessingService:
         # Initialize with basic configuration
         self.supported_formats = ['.jpg', '.jpeg', '.png', '.avif', '.webp', '.mp4', '.avi', '.mov', '.glb', '.gltf', '.obj']
         try:
-            self.ai_processor = AIProcessor()
+            AIProcessor = _import_ai_processor()
+            if AIProcessor:
+                self.ai_processor = AIProcessor()
+            else:
+                self.ai_processor = None
         except Exception as e:
             print(f"Warning: Failed to initialize AI processor: {e}")
             self.ai_processor = None
         
         try:
-            self.mesh_generator = MeshGenerator()
+            MeshGenerator = _import_mesh_generator()
+            if MeshGenerator:
+                self.mesh_generator = MeshGenerator()
+            else:
+                self.mesh_generator = None
         except Exception as e:
             print(f"Warning: Failed to initialize mesh generator: {e}")
             self.mesh_generator = None
         
         # Initialize segmenter (try neural first, falls back to simple)
         try:
-            self.segmenter = SemanticSegmenter()
-            # Keep segmenter even if neural model failed - fallback methods will work
+            SemanticSegmenter, SimpleSegmenter = _import_segmentation()
+            if SemanticSegmenter:
+                self.segmenter = SemanticSegmenter()
+            else:
+                self.segmenter = None
         except Exception as e:
             logger.warning(f"Failed to initialize semantic segmenter: {e}")
             self.segmenter = None
         
         # Initialize camera pose estimator
-        self.pose_estimator = CameraPoseEstimator()
-        
-        # Initialize SfM-based pose estimator (replaces heuristic)
         try:
-            self.sfm_estimator = get_sfm_estimator()
-            logger.info("✓ Structure-from-Motion pose estimator initialized")
+            CameraPoseEstimator = _import_camera_pose()
+            if CameraPoseEstimator:
+                self.pose_estimator = CameraPoseEstimator()
+            else:
+                self.pose_estimator = None
+        except Exception as e:
+            logger.warning(f"Failed to initialize camera pose estimator: {e}")
+            self.pose_estimator = None
+        
+        # Initialize SfM-based pose estimator
+        try:
+            StructureFromMotion, get_sfm_estimator = _import_sfm()
+            if get_sfm_estimator:
+                self.sfm_estimator = get_sfm_estimator()
+                logger.info("✓ Structure-from-Motion pose estimator initialized")
+            else:
+                self.sfm_estimator = None
         except Exception as e:
             logger.warning(f"Failed to initialize SfM: {e}, will use fallback")
             self.sfm_estimator = None
         
         # Initialize frame sampler
-        self.frame_sampler = SmartFrameSampler()
+        try:
+            SmartFrameSampler = _import_frame_sampler()
+            if SmartFrameSampler:
+                self.frame_sampler = SmartFrameSampler()
+            else:
+                self.frame_sampler = None
+        except Exception as e:
+            logger.warning(f"Failed to initialize frame sampler: {e}")
+            self.frame_sampler = None
         
         # Initialize mesh optimizer
-        self.mesh_optimizer = MeshOptimizer()
+        try:
+            MeshOptimizer = _import_mesh_optimizer()
+            if MeshOptimizer:
+                self.mesh_optimizer = MeshOptimizer()
+            else:
+                self.mesh_optimizer = None
+        except Exception as e:
+            logger.warning(f"Failed to initialize mesh optimizer: {e}")
+            self.mesh_optimizer = None
         
         # Initialize advanced reconstruction pipeline (Options A, B, C)
         try:
