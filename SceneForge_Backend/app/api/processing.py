@@ -126,17 +126,22 @@ async def upload_files(
     return status
 
 async def process_files(job_id: str, file_paths: List[str], prompt: str, scene_name: str):
+    """Background task to process uploaded files"""
     try:
+        logger.info(f"[Job {job_id}] Starting file processing for {file_paths}")
         output_dir = Path("outputs") / scene_name
         
         async def update_status(job_id: str, progress: int, message: str):
+            """Update job progress status"""
             if job_id in PROCESSING_JOBS:
                 job = PROCESSING_JOBS[job_id]
                 job.progress = progress
                 job.message = message
                 job.updatedAt = datetime.now()
+                logger.info(f"[Job {job_id}] Progress: {progress}% - {message}")
         
-        # Process the files
+        # Call processing service
+        logger.info(f"[Job {job_id}] Calling processing_service.process_scene()")
         result = await processing_service.process_scene(
             file_paths[0],  # Currently handling single file
             str(output_dir),
@@ -145,6 +150,8 @@ async def process_files(job_id: str, file_paths: List[str], prompt: str, scene_n
             update_status
         )
         
+        logger.info(f"[Job {job_id}] Processing completed successfully: {result}")
+        
         # Update job status with results
         if job_id in PROCESSING_JOBS:
             job = PROCESSING_JOBS[job_id]
@@ -152,14 +159,16 @@ async def process_files(job_id: str, file_paths: List[str], prompt: str, scene_n
             job.progress = 100
             job.message = "Processing completed successfully"
             job.updatedAt = datetime.now()
+            logger.info(f"[Job {job_id}] Status updated to completed")
             
     except Exception as e:
+        logger.error(f"[Job {job_id}] Processing failed: {str(e)}", exc_info=True)
         if job_id in PROCESSING_JOBS:
             job = PROCESSING_JOBS[job_id]
             job.status = "failed"
-            job.message = str(e)
+            job.message = str(e)[:200]  # Truncate long error messages
             job.updatedAt = datetime.now()
-        logger.error(f"Processing task {job_id} failed: {str(e)}", exc_info=True)
+        logger.error(f"[Job {job_id}] Status updated to failed")
 
 @router.get("/tasks")
 async def list_processing_tasks():
