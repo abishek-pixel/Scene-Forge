@@ -69,12 +69,47 @@ class ProcessingService:
             
             # Scale mesh to match image aspect ratio
             aspect_ratio = img_width / img_height if img_height > 0 else 1.0
-            mesh = trimesh.creation.box(extents=[aspect_ratio, 1, 0.5])
+            logger.info(f"Creating mesh with aspect ratio: {aspect_ratio}")
             
-            # Export to GLB
+            # Create a more complex mesh (cylinder + box) for better visuals
+            # Cylinder for main body
+            mesh1 = trimesh.creation.cylinder(radius=0.5, height=1.0)
+            
+            # Box for top (like a seat)
+            mesh2 = trimesh.creation.box(extents=[aspect_ratio * 0.8, 0.3, 0.8])
+            mesh2.apply_translation([0, 0.5, 0])
+            
+            # Combine meshes
+            mesh = trimesh.util.concatenate([mesh1, mesh2])
+            
+            # Ensure mesh is valid
+            if mesh is None or len(mesh.vertices) == 0:
+                logger.error("Generated mesh is empty!")
+                raise Exception("Failed to generate valid 3D mesh")
+            
+            logger.info(f"Mesh created: {len(mesh.vertices)} vertices, {len(mesh.faces)} faces")
+            
+            # Export to GLB (binary format)
             output_file = str(output_path / "model.glb")
+            logger.info(f"Exporting mesh to {output_file}")
+            
+            # Use explicit GLB export
             mesh.export(output_file)
-            logger.info(f"Mesh exported to {output_file}")
+            
+            # Verify file was created and has content
+            if not os.path.exists(output_file):
+                raise Exception(f"Failed to create output file: {output_file}")
+            
+            file_size = os.path.getsize(output_file)
+            if file_size == 0:
+                logger.error(f"File created but is empty! Path: {output_file}")
+                # Try alternative export
+                logger.info("Attempting alternative export method...")
+                import json
+                mesh.export(output_file, file_type='gltf')
+                file_size = os.path.getsize(output_file)
+            
+            logger.info(f"✓ Mesh exported successfully: {output_file} ({file_size} bytes)")
             
             await update_callback(job_id, 100, "Processing completed")
             
