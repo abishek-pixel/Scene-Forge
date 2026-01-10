@@ -12,12 +12,12 @@ python-multipart>=0.0.6
 aiofiles>=23.1.0
 python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4
-# Base ML/AI requirements
-torch>=2.0.0
-torchvision>=0.15.0
-transformers>=4.30.0
-diffusers>=0.21.0
-accelerate>=0.21.0
+# Base ML/AI requirements (DISABLED for Render - causes build to fail)
+# torch>=2.0.0
+# torchvision>=0.15.0
+# transformers>=4.30.0
+# diffusers>=0.21.0
+# accelerate>=0.21.0
 
 # Image processing
 Pillow>=10.0.0
@@ -30,27 +30,27 @@ trimesh>=4.0.0
 numpy-stl>=3.0.0
 meshio>=5.3.4
 
-# Deep learning models
-timm>=0.9.0
-huggingface_hub>=0.16.0
-omegaconf>=2.3.0
+# Deep learning models (DISABLED for Render)
+# timm>=0.9.0
+# huggingface_hub>=0.16.0
+# omegaconf>=2.3.0
 
 # Visualization
 matplotlib>=3.7.0
 scikit-image>=0.21.0
 
-# Point cloud processing
-point-e @ git+https://github.com/openai/point-e.git
+# Point cloud processing (DISABLED for Render - git install fails)
+# point-e @ git+https://github.com/openai/point-e.git
 
 # Structure-from-Motion (camera pose estimation)
 # PyColmap - Optional but recommended for better SfM
 # pycolmap>=0.0.1  # Uncomment after COLMAP installation: pip install pycolmap
 
-# Depth estimation
-midas @ git+https://github.com/isl-org/MiDaS.git
+# Depth estimation (DISABLED for Render - git install fails)
+# midas @ git+https://github.com/isl-org/MiDaS.git
 
-# Scene understanding
-segment-anything @ git+https://github.com/facebookresearch/segment-anything.git
+# Scene understanding (DISABLED for Render - git install fails)
+# segment-anything @ git+https://github.com/facebookresearch/segment-anything.git
 
 # Note: GET3D needs to be installed manually:
 # 1. git clone https://github.com/nv-tlabs/GET3D.git

@@ -1,5 +1,4 @@
 import os
-import torch
 import numpy as np
 from pathlib import Path
 from typing import List, Optional, Dict, Any
@@ -9,12 +8,33 @@ from stl import mesh as stl_mesh
 import meshio
 from matplotlib import pyplot as plt
 from skimage import measure
-from transformers import pipeline
-from huggingface_hub import hf_hub_download
-from segment_anything import sam_model_registry, SamPredictor
 import asyncio
 import json
 from datetime import datetime
+
+# Lazy imports for heavy dependencies
+def _import_torch():
+    try:
+        import torch
+        return torch
+    except ImportError:
+        return None
+
+def _import_transformers():
+    try:
+        from transformers import pipeline
+        from huggingface_hub import hf_hub_download
+        return pipeline, hf_hub_download
+    except ImportError:
+        return None, None
+
+def _import_sam():
+    try:
+        from segment_anything import sam_model_registry, SamPredictor
+        return sam_model_registry, SamPredictor
+    except ImportError:
+        return None, None
+
 from .mesh_generator import MeshGenerator
 
 class AIProcessor:
