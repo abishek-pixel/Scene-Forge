@@ -65,30 +65,48 @@ class ProcessingService:
                     from .depth_reconstruction import DepthReconstructionPipeline
                     self.depth_pipeline = DepthReconstructionPipeline()
                 
-                # Generate 3D model using depth estimation
+                logger.info(f"[Job {job_id}] Starting depth-based 3D reconstruction")
+                
+                # Generate 3D model using depth estimation with timeout
                 output_file = str(output_path / "model.glb")
-                output_file, metadata = self.depth_pipeline.process_image_to_3d(
-                    input_path, 
-                    output_file
-                )
                 
-                logger.info(f"✓ ML-based reconstruction complete: {output_file}")
+                try:
+                    import asyncio
+                    # Run with 120 second timeout
+                    logger.info(f"[Job {job_id}] Depth reconstruction with 120s timeout")
+                    await asyncio.wait_for(
+                        asyncio.to_thread(
+                            self.depth_pipeline.process_image_to_3d,
+                            input_path,
+                            output_file
+                        ),
+                        timeout=120.0
+                    )
+                    logger.info(f"[Job {job_id}] ✓ ML-based reconstruction complete")
+                    
+                except asyncio.TimeoutError:
+                    logger.warning(f"[Job {job_id}] Depth reconstruction timed out after 120s, using fallback")
+                    # Fallback to simple mesh if depth estimation takes too long
+                    await update_callback(job_id, 60, "Timeout on depth estimation, using fallback mesh...")
+                    raise TimeoutError("Depth estimation timed out")
+                    
+            except (TimeoutError, Exception) as e:
+                logger.warning(f"[Job {job_id}] ML-based reconstruction failed or timed out: {e}, falling back to simple mesh")
+                await update_callback(job_id, 60, "Using fallback 3D mesh generation...")
                 
-            except Exception as e:
-                logger.warning(f"ML-based reconstruction failed: {e}, falling back to simple mesh")
                 # Fallback: simple geometric mesh
                 import trimesh
                 
                 aspect_ratio = img_width / img_height if img_height > 0 else 1.0
-                logger.info(f"Creating fallback mesh with aspect ratio: {aspect_ratio}")
+                logger.info(f"[Job {job_id}] Creating fallback mesh with aspect ratio: {aspect_ratio}")
                 
-                # Create a simple box as fallback
+                # Create a simple but interesting shape as fallback
                 mesh = trimesh.creation.box(extents=[aspect_ratio, 1.0, 0.5])
                 
                 output_file = str(output_path / "model.glb")
                 mesh.export(output_file)
                 
-                logger.info(f"✓ Fallback mesh created: {output_file}")
+                logger.info(f"[Job {job_id}] ✓ Fallback mesh created: {output_file}")
             
             # Verify file
             if not os.path.exists(output_file):

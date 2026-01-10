@@ -21,34 +21,43 @@ class DepthReconstructionPipeline:
     Reconstructs 3D geometry from a single image using depth estimation.
     """
     
+    # Class-level cache for MiDaS model (loaded once, reused)
+    _midas_model = None
+    _midas_transform = None
+    _model_device = None
+    
     def __init__(self):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.midas_model = None
-        self.midas_transform = None
         logger.info(f"DepthReconstructionPipeline initialized on {self.device}")
     
-    def _load_midas_model(self):
-        """Load MiDaS model for depth estimation"""
-        if self.midas_model is not None:
-            return
+    @classmethod
+    def _get_midas_model(cls, device):
+        """Get cached MiDaS model or load it once"""
+        if cls._midas_model is None:
+            logger.info(f"Loading MiDaS model for device: {device}")
+            try:
+                # Load MiDaS model
+                midas = torch.hub.load("intel-isl/MiDaS", "MiDaS_small", trust_repo=True)
+                midas.to(device)
+                midas.eval()
+                
+                # Load transforms
+                midas_transforms = torch.hub.load("intel-isl/MiDaS", "transforms", trust_repo=True)
+                transform = midas_transforms.small_transform
+                
+                cls._midas_model = midas
+                cls._midas_transform = transform
+                cls._model_device = device
+                logger.info("✓ MiDaS model loaded and cached")
+            except Exception as e:
+                logger.error(f"Failed to load MiDaS model: {e}")
+                raise
         
-        logger.info("Loading MiDaS depth estimation model...")
-        try:
-            # Load MiDaS model
-            midas = torch.hub.load("intel-isl/MiDaS", "MiDaS_small")
-            midas.to(self.device)
-            midas.eval()
-            
-            # Load transforms
-            midas_transforms = torch.hub.load("intel-isl/MiDaS", "transforms")
-            transform = midas_transforms.small_transform
-            
-            self.midas_model = midas
-            self.midas_transform = transform
-            logger.info("✓ MiDaS model loaded successfully")
-        except Exception as e:
-            logger.error(f"Failed to load MiDaS model: {e}")
-            raise
+        return cls._midas_model, cls._midas_transform
+    
+    def _load_midas_model(self):
+        """Load or get cached MiDaS model"""
+        self.midas_model, self.midas_transform = self._get_midas_model(self.device)
     
     def estimate_depth(self, image_path: str) -> np.ndarray:
         """
@@ -63,36 +72,62 @@ class DepthReconstructionPipeline:
         logger.info(f"Estimating depth for {image_path}")
         self._load_midas_model()
         
-        # Load and prepare image
-        img = cv2.imread(image_path)
-        if img is None:
-            raise ValueError(f"Could not read image: {image_path}")
+        try:
+            # Load and prepare image
+            logger.info("Loading image...")
+            img = cv2.imread(image_path)
+            if img is None:
+                raise ValueError(f"Could not read image: {image_path}")
+            
+            logger.info(f"Original image size: {img.shape[1]}x{img.shape[0]}")
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            
+            # Downsample for faster processing on CPU
+            # MiDaS works well with smaller images
+            max_size = 512
+            h, w = img.shape[:2]
+            if w > max_size or h > max_size:
+                scale = max_size / max(w, h)
+                w_new = int(w * scale)
+                h_new = int(h * scale)
+                logger.info(f"Downsampling to {w_new}x{h_new} for faster processing")
+                img = cv2.resize(img, (w_new, h_new), interpolation=cv2.INTER_AREA)
+            
+            logger.info(f"Processing image: {img.shape[1]}x{img.shape[0]}")
+            
+            # Transform for MiDaS
+            logger.info("Transforming image for MiDaS...")
+            input_batch = self.midas_transform(img).to(self.device)
+            
+            # Estimate depth
+            logger.info("Running depth estimation (this may take 10-30s on CPU)...")
+            with torch.no_grad():
+                prediction = self.midas_model(input_batch)
+                logger.info("Interpolating depth map...")
+                prediction = torch.nn.functional.interpolate(
+                    prediction.unsqueeze(1),
+                    size=img.shape[:2],
+                    mode="bicubic",
+                    align_corners=False,
+                ).squeeze()
+            
+            logger.info("Normalizing depth...")
+            # Normalize depth to 0-1
+            depth_min = prediction.min()
+            depth_max = prediction.max()
+            if depth_max > depth_min:
+                depth_normalized = (prediction - depth_min) / (depth_max - depth_min)
+            else:
+                depth_normalized = prediction
+            
+            depth_map = depth_normalized.cpu().numpy()
+            logger.info(f"✓ Depth estimation complete: {depth_map.shape}")
+            
+            return depth_map
         
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        h, w = img.shape[:2]
-        
-        # Transform for MiDaS
-        input_batch = self.midas_transform(img).to(self.device)
-        
-        # Estimate depth
-        with torch.no_grad():
-            prediction = self.midas_model(input_batch)
-            prediction = torch.nn.functional.interpolate(
-                prediction.unsqueeze(1),
-                size=img.shape[:2],
-                mode="bicubic",
-                align_corners=False,
-            ).squeeze()
-        
-        # Normalize depth to 0-1
-        depth_min = prediction.min()
-        depth_max = prediction.max()
-        depth_normalized = (prediction - depth_min) / (depth_max - depth_min)
-        
-        depth_map = depth_normalized.cpu().numpy()
-        logger.info(f"Depth estimation complete: {depth_map.shape}")
-        
-        return depth_map
+        except Exception as e:
+            logger.error(f"Depth estimation failed: {e}", exc_info=True)
+            raise
     
     def depth_to_point_cloud(self, depth_map: np.ndarray, image: Image.Image, 
                             focal_length: Optional[float] = None) -> np.ndarray:
