@@ -5,6 +5,8 @@ Advanced 3D Reconstruction Techniques:
 - Option A: Texture mapping and normal-based coloring
 """
 
+from __future__ import annotations
+
 import numpy as np
 from typing import List, Tuple, Optional, Dict, Any
 import logging

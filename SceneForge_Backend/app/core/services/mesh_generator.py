@@ -3,6 +3,8 @@ Mesh generation from depth maps and RGB images.
 Handles point cloud creation, mesh generation, and cleaning.
 """
 
+from __future__ import annotations
+
 import numpy as np
 import os
 from typing import Dict, Any, Tuple, Optional, List

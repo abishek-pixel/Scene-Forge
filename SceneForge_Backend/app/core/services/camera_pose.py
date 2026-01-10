@@ -3,6 +3,8 @@ Camera pose estimation and multi-view registration for 3D reconstruction.
 Aligns multiple point clouds from different viewpoints into a unified coordinate frame.
 """
 
+from __future__ import annotations
+
 import numpy as np
 from typing import List, Tuple, Optional
 import logging

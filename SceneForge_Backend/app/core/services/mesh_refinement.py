@@ -3,6 +3,8 @@ Mesh Refinement Techniques for High-Quality 3D Output
 Addresses noise, smoothness, and visual quality issues
 """
 
+from __future__ import annotations
+
 import numpy as np
 from typing import Tuple, Optional
 import logging
