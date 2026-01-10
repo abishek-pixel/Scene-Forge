@@ -14,17 +14,10 @@ logger = logging.getLogger(__name__)
 
 class ProcessingService:
     def __init__(self):
-        """Initialize processing service with graceful degradation for missing ML deps"""
+        """Initialize processing service with ML-based reconstruction"""
         self.supported_formats = ['.jpg', '.jpeg', '.png', '.avif', '.webp', '.mp4', '.avi', '.mov', '.glb', '.gltf', '.obj']
-        self.ai_processor = None  # ML deps disabled on Render
-        self.mesh_generator = None
-        self.segmenter = None
-        self.pose_estimator = None
-        self.sfm_estimator = None
-        self.frame_sampler = None
-        self.mesh_optimizer = None
-        self.advanced_reconstruction = None
-        logger.info("ProcessingService initialized (ML features disabled for Render deployment)")
+        self.depth_pipeline = None  # Lazy load
+        logger.info("ProcessingService initialized (ML-based 3D reconstruction enabled)")
 
     async def process_scene(self, 
                           input_path: str, 
@@ -63,53 +56,46 @@ class ProcessingService:
                 logger.warning(f"Could not load image: {e}, using defaults")
                 img_width, img_height = 512, 512
             
-            # Create simple mesh based on image dimensions
-            await update_callback(job_id, 50, "Generating 3D model...")
-            import trimesh
+            # Use ML-based 3D reconstruction
+            await update_callback(job_id, 50, "Generating 3D model with depth estimation...")
             
-            # Scale mesh to match image aspect ratio
-            aspect_ratio = img_width / img_height if img_height > 0 else 1.0
-            logger.info(f"Creating mesh with aspect ratio: {aspect_ratio}")
+            try:
+                # Lazy load depth reconstruction pipeline
+                if self.depth_pipeline is None:
+                    from .depth_reconstruction import DepthReconstructionPipeline
+                    self.depth_pipeline = DepthReconstructionPipeline()
+                
+                # Generate 3D model using depth estimation
+                output_file = str(output_path / "model.glb")
+                output_file, metadata = self.depth_pipeline.process_image_to_3d(
+                    input_path, 
+                    output_file
+                )
+                
+                logger.info(f"✓ ML-based reconstruction complete: {output_file}")
+                
+            except Exception as e:
+                logger.warning(f"ML-based reconstruction failed: {e}, falling back to simple mesh")
+                # Fallback: simple geometric mesh
+                import trimesh
+                
+                aspect_ratio = img_width / img_height if img_height > 0 else 1.0
+                logger.info(f"Creating fallback mesh with aspect ratio: {aspect_ratio}")
+                
+                # Create a simple box as fallback
+                mesh = trimesh.creation.box(extents=[aspect_ratio, 1.0, 0.5])
+                
+                output_file = str(output_path / "model.glb")
+                mesh.export(output_file)
+                
+                logger.info(f"✓ Fallback mesh created: {output_file}")
             
-            # Create a more complex mesh (cylinder + box) for better visuals
-            # Cylinder for main body
-            mesh1 = trimesh.creation.cylinder(radius=0.5, height=1.0)
-            
-            # Box for top (like a seat)
-            mesh2 = trimesh.creation.box(extents=[aspect_ratio * 0.8, 0.3, 0.8])
-            mesh2.apply_translation([0, 0.5, 0])
-            
-            # Combine meshes
-            mesh = trimesh.util.concatenate([mesh1, mesh2])
-            
-            # Ensure mesh is valid
-            if mesh is None or len(mesh.vertices) == 0:
-                logger.error("Generated mesh is empty!")
-                raise Exception("Failed to generate valid 3D mesh")
-            
-            logger.info(f"Mesh created: {len(mesh.vertices)} vertices, {len(mesh.faces)} faces")
-            
-            # Export to GLB (binary format)
-            output_file = str(output_path / "model.glb")
-            logger.info(f"Exporting mesh to {output_file}")
-            
-            # Use explicit GLB export
-            mesh.export(output_file)
-            
-            # Verify file was created and has content
+            # Verify file
             if not os.path.exists(output_file):
                 raise Exception(f"Failed to create output file: {output_file}")
             
             file_size = os.path.getsize(output_file)
-            if file_size == 0:
-                logger.error(f"File created but is empty! Path: {output_file}")
-                # Try alternative export
-                logger.info("Attempting alternative export method...")
-                import json
-                mesh.export(output_file, file_type='gltf')
-                file_size = os.path.getsize(output_file)
-            
-            logger.info(f"✓ Mesh exported successfully: {output_file} ({file_size} bytes)")
+            logger.info(f"Model file size: {file_size} bytes")
             
             await update_callback(job_id, 100, "Processing completed")
             
