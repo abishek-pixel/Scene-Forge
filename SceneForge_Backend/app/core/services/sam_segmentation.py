@@ -47,7 +47,7 @@ class SAMSegmentation:
                 checkpoint_path = "/app/checkpoints/sam_vit_h_4b8939.pth"
             
             if not Path(checkpoint_path).exists():
-                logger.warning(f"SAM checkpoint not found at {checkpoint_path}")
+                logger.debug(f"SAM checkpoint not found at {checkpoint_path} - using fallback")
                 return False
             
             logger.info(f"Loading SAM from {checkpoint_path}...")
@@ -59,11 +59,15 @@ class SAMSegmentation:
             return True
             
         except ImportError as e:
-            logger.warning(f"SAM not installed: {e}")
+            logger.debug(f"SAM not installed: {e} - using fallback segmentation")
             return False
         except Exception as e:
-            logger.error(f"Failed to load SAM: {e}")
+            logger.debug(f"Failed to load SAM: {e} - using fallback segmentation")
             return False
+    
+    def _simple_fallback_mask(self, shape: tuple) -> np.ndarray:
+        """Simple fallback: full image mask"""
+        return np.ones(shape)
     
     def segment(self, image: np.ndarray, min_mask_area: int = 100) -> np.ndarray:
         """
@@ -77,8 +81,8 @@ class SAMSegmentation:
             Binary mask (H, W) where foreground=1, background=0
         """
         if not self.load_model():
-            logger.warning("SAM unavailable, returning full image mask")
-            return np.ones(image.shape[:2])
+            logger.debug("SAM unavailable, using fallback segmentation")
+            return self._simple_fallback_mask(image.shape[:2])
         
         try:
             # Ensure image is uint8
