@@ -1,11 +1,16 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException
 from app.api import auth, scenes, processing
 from app.core.logger import setup_logging
 from app.core.config import settings
+import traceback
+import logging
 
 setup_logging()
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="SceneForge Backend API")
 
@@ -37,8 +42,25 @@ async def preflight_handler(request: Request, full_path: str):
         headers={
             "Access-Control-Allow-Origin": request.headers.get("origin", "*"),
             "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            "Access-Control-Allow-Headers": "*",
             "Access-Control-Max-Age": "3600",
+        }
+    )
+
+# Global exception handler for 500 errors
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled exception: {str(exc)}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "status": "error",
+            "error": "Internal server error",
+            "message": str(exc)[:200],  # Limit message length
+            "path": str(request.url.path)
+        },
+        headers={
+            "Access-Control-Allow-Origin": request.headers.get("origin", "*"),
         }
     )
 
@@ -47,14 +69,41 @@ async def preflight_handler(request: Request, full_path: str):
 async def root():
     return {"message": "Welcome to FastAPI backend!"}
 
-# Add request logging middleware
+# Request size limiting middleware
+@app.middleware("http")
+async def limit_upload_size(request: Request, call_next):
+    """Limit upload size to 500MB"""
+    # Set max body size for the request
+    request.state.max_body_size = 1024 * 1024 * 500  # 500MB
+    try:
+        response = await call_next(request)
+        return response
+    except Exception as e:
+        logger.error(f"Request processing error: {str(e)}", exc_info=True)
+        return JSONResponse(
+            status_code=400,
+            content={
+                "status": "error",
+                "message": f"Request error: {str(e)[:100]}",
+                "error": "request_failed"
+            },
+            headers={
+                "Access-Control-Allow-Origin": request.headers.get("origin", "*"),
+            }
+        )
+
+# Request logging middleware
 @app.middleware("http")
 async def log_requests(request, call_next):
-    print(f"\nIncoming request: {request.method} {request.url.path}")
-    print(f"Headers: {dict(request.headers)}")
-    response = await call_next(request)
-    print(f"Response status: {response.status_code}")
-    return response
+    """Log all requests with error handling"""
+    try:
+        logger.info(f"Incoming: {request.method} {request.url.path}")
+        response = await call_next(request)
+        logger.info(f"Response: {response.status_code} {request.url.path}")
+        return response
+    except Exception as e:
+        logger.error(f"Request error on {request.url.path}: {str(e)}", exc_info=True)
+        raise
 
 # Health check endpoint
 @app.get("/health")

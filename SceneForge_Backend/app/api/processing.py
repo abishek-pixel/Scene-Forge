@@ -75,55 +75,97 @@ async def upload_files(
     - prompt: Optional description/prompt
     - quality: Processing quality (default: high)
     """
-    print(f"\n=== Processing Upload Request ===")
-    print(f"Files received: {[f.filename for f in files]}")
-    print(f"Scene name: {scene_name}")
-    print(f"Quality: {quality}")
-    print(f"Prompt: {prompt}")
-    print("================================\n")
-    
-    # Create directory for uploads if it doesn't exist
-    upload_dir = Path("uploads") / datetime.now().strftime("%Y%m%d_%H%M%S")
-    upload_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Convert to absolute path
-    upload_dir = upload_dir.absolute()
-    
-    saved_files = []
-    for file in files:
-        file_path = upload_dir / file.filename
-        await save_upload_file(file, file_path)
-        # Store absolute path
-        saved_files.append(str(file_path.absolute()))
-    
-    # Start processing job
-    job_id = str(len(PROCESSING_JOBS) + 1)
-    status = ProcessingStatus(
-        id=job_id,
-        name=scene_name,
-        status="processing",
-        progress=0,
-        message="Starting processing...",
-        stage="Initializing",
-        eta="Calculating...",
-        details=[
-            {"step": "Initialization", "completed": True},
-            {"step": "File processing", "completed": False},
-            {"step": "Scene generation", "completed": False},
-            {"step": "Quality checks", "completed": False},
-            {"step": "Final optimization", "completed": False}
-        ],
-        sceneId=scene_name,
-        createdAt=datetime.now(),
-        updatedAt=datetime.now()
-    )
-    
-    PROCESSING_JOBS[job_id] = status
-    
-    # Start processing in background
-    asyncio.create_task(process_files(job_id, saved_files, prompt, scene_name))
-    
-    return status
+    try:
+        logger.info(f"=== Upload Request ===")
+        logger.info(f"Files: {[f.filename for f in files]}")
+        logger.info(f"Scene: {scene_name}")
+        logger.info(f"Quality: {quality}")
+        
+        # Validate inputs
+        if not files or len(files) == 0:
+            return {
+                "status": "error",
+                "error": "no_files",
+                "message": "No files provided"
+            }
+        
+        if not scene_name or scene_name.strip() == "":
+            scene_name = f"Scene_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        
+        # Create directory for uploads if it doesn't exist
+        upload_dir = Path("uploads") / datetime.now().strftime("%Y%m%d_%H%M%S")
+        try:
+            upload_dir.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            logger.error(f"Failed to create upload directory: {e}")
+            return {
+                "status": "error",
+                "error": "directory_error",
+                "message": f"Could not create upload directory: {str(e)[:100]}"
+            }
+        
+        # Convert to absolute path
+        upload_dir = upload_dir.absolute()
+        
+        saved_files = []
+        for file in files:
+            try:
+                file_path = upload_dir / file.filename
+                await save_upload_file(file, file_path)
+                saved_files.append(str(file_path.absolute()))
+                logger.info(f"Saved: {file.filename} -> {file_path}")
+            except Exception as e:
+                logger.error(f"Failed to save file {file.filename}: {e}")
+                return {
+                    "status": "error",
+                    "error": "file_save_error",
+                    "message": f"Failed to save {file.filename}: {str(e)[:100]}"
+                }
+        
+        # Start processing job
+        job_id = str(len(PROCESSING_JOBS) + 1)
+        status = ProcessingStatus(
+            id=job_id,
+            name=scene_name,
+            status="processing",
+            progress=0,
+            message="Starting processing...",
+            stage="Initializing",
+            eta="Calculating...",
+            details=[
+                {"step": "Initialization", "completed": True},
+                {"step": "File processing", "completed": False},
+                {"step": "Scene generation", "completed": False},
+                {"step": "Quality checks", "completed": False},
+                {"step": "Final optimization", "completed": False}
+            ],
+            sceneId=scene_name,
+            createdAt=datetime.now(),
+            updatedAt=datetime.now()
+        )
+        
+        PROCESSING_JOBS[job_id] = status
+        
+        # Start processing in background (non-blocking)
+        asyncio.create_task(process_files(job_id, saved_files, prompt, scene_name))
+        
+        logger.info(f"Job {job_id} created, processing started in background")
+        
+        return {
+            "status": "accepted",
+            "job_id": job_id,
+            "message": "File uploaded successfully, processing started",
+            "scene_name": scene_name,
+            "files": [f.filename for f in files]
+        }
+        
+    except Exception as e:
+        logger.error(f"Upload endpoint error: {str(e)}", exc_info=True)
+        return {
+            "status": "error",
+            "error": "upload_failed",
+            "message": f"Upload failed: {str(e)[:100]}"
+        }
 
 async def process_files(job_id: str, file_paths: List[str], prompt: str, scene_name: str):
     """Background task to process uploaded files"""
