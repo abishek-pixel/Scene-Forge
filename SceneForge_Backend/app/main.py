@@ -1,5 +1,6 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from app.api import auth, scenes, processing
 from app.core.logger import setup_logging
 from app.core.config import settings
@@ -8,7 +9,7 @@ setup_logging()
 
 app = FastAPI(title="SceneForge Backend API")
 
-# Configure CORS
+# Configure CORS - MUST be added first, before other middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -21,11 +22,25 @@ app.add_middleware(
         "http://localhost:8000",  # Local backend
     ],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allow_headers=["Content-Type", "Authorization"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"],
+    allow_headers=["*"],  # Allow all headers
     expose_headers=["*"],
     max_age=3600,
 )
+
+# Add explicit OPTIONS handler for all routes (preflight)
+@app.options("/{full_path:path}")
+async def preflight_handler(request: Request, full_path: str):
+    return JSONResponse(
+        content={},
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": request.headers.get("origin", "*"),
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            "Access-Control-Max-Age": "3600",
+        }
+    )
 
 # Add this before the router to ensure the root endpoint works
 @app.get("/")
