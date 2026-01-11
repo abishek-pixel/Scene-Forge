@@ -85,9 +85,15 @@ class ProcessingService:
                         str(output_path / "model.glb")
                     )
                     
-                    file_size = os.path.getsize(output_file)
-                    logger.info(f"✓ Advanced pipeline success: {file_size/1024:.1f}KB")
+                    # Verify file exists and is not empty
+                    if not os.path.exists(output_file):
+                        raise Exception(f"Advanced pipeline: output file not created")
                     
+                    file_size = os.path.getsize(output_file)
+                    if file_size == 0:
+                        raise Exception(f"Advanced pipeline: exported empty file (0 bytes)")
+                    
+                    logger.info(f"✓ Advanced pipeline success: {file_size/1024:.1f}KB")
                     await update_callback(job_id, 100, "Advanced processing completed")
                     
                     return {
@@ -103,51 +109,57 @@ class ProcessingService:
                     }
                     
                 except Exception as e:
-                    logger.warning(f"Advanced pipeline failed: {e}, falling back to basic")
+                    logger.warning(f"Advanced pipeline failed: {str(e)}, falling back to basic")
+                    logger.debug(f"Advanced error details: {e}", exc_info=True)
+                    # Continue to fallback below
             
             # FALLBACK: Simple fast mesh generation
-            logger.info(f"[Job {job_id}] Using FALLBACK PIPELINE (basic mesh generation)")
-            await update_callback(job_id, 40, "Basic: Loading image...")
+            logger.info(f"[Job {job_id}] ⚠ Using FALLBACK PIPELINE (basic mesh generation)")
+            await update_callback(job_id, 40, "Fallback: Loading image...")
             
             try:
                 img = Image.open(input_path)
                 img_width, img_height = img.size
-                logger.info(f"Image: {img_width}x{img_height}")
+                logger.info(f"[{job_id}] Image loaded: {img_width}x{img_height}")
             except Exception as e:
-                logger.warning(f"Could not load image: {e}")
+                logger.warning(f"[{job_id}] Could not load image: {e}, using defaults")
                 img_width, img_height = 512, 512
             
-            await update_callback(job_id, 60, "Basic: Generating mesh...")
+            await update_callback(job_id, 60, "Fallback: Generating mesh...")
             
             # Create adaptive mesh based on image aspect ratio
             aspect = img_width / img_height if img_height > 0 else 1.0
             height = min(2.0, 0.5 + (img_height / img_width) * 1.5) if img_width > 0 else 1.0
             width = min(2.0, 0.5 + (img_width / img_height) * 1.5) if img_height > 0 else 1.0
             
-            logger.info(f"Creating box: {width:.2f} x {height:.2f} x 0.5")
+            logger.info(f"[{job_id}] Creating fallback box: {width:.2f} x {height:.2f} x 0.5")
             
             # Create mesh with explicit validation
             mesh = trimesh.creation.box(extents=[width, height, 0.5])
             
             # Validate mesh before export
-            assert len(mesh.vertices) > 0, "Mesh has no vertices"
-            assert len(mesh.faces) > 0, "Mesh has no faces"
-            logger.info(f"Mesh valid: {len(mesh.vertices)} vertices, {len(mesh.faces)} faces")
+            assert len(mesh.vertices) > 0, "Fallback mesh has no vertices"
+            assert len(mesh.faces) > 0, "Fallback mesh has no faces"
+            logger.info(f"[{job_id}] Mesh valid: {len(mesh.vertices)} vertices, {len(mesh.faces)} faces")
             
-            # Export with explicit format
+            # Export with explicit format and safe mode
             output_file = str(output_path / "model.glb")
-            logger.info(f"Exporting to: {output_file}")
+            logger.info(f"[{job_id}] Exporting fallback to: {output_file}")
+            
+            # Use file_type explicitly
             mesh.export(output_file, file_type='glb')
             
-            # CRITICAL: Verify file was actually created
+            # CRITICAL: Verify file was actually created and is not empty
             if not os.path.exists(output_file):
-                raise Exception(f"Export failed: file not created at {output_file}")
+                raise Exception(f"[{job_id}] Export failed: file not created at {output_file}")
             
             file_size = os.path.getsize(output_file)
-            if file_size == 0:
-                raise Exception(f"Export produced empty file (0 bytes)")
+            logger.info(f"[{job_id}] Export created file: {file_size} bytes")
             
-            logger.info(f"✓ Export success: {file_size/1024:.1f}KB")
+            if file_size == 0:
+                raise Exception(f"[{job_id}] Export produced empty file (0 bytes) - file system issue")
+            
+            logger.info(f"[{job_id}] ✓ Fallback export success: {file_size/1024:.1f}KB")
             
             await update_callback(job_id, 100, "Fallback processing completed")
             
