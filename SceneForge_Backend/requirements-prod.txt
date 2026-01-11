@@ -37,11 +37,16 @@ matplotlib>=3.7.0
 celery[redis]>=5.3.0
 redis>=4.6.0
 
-# Depth estimation and 3D reconstruction
-# MiDaS will be dynamically loaded from torch hub
-# - torch
-# - torchvision
-# - transformers
-# - diffusers
-# - accelerate
-# - opencv-python-headless
+# Advanced 3D Reconstruction Pipeline (90% accuracy target)
+# Segmentation: Segment Anything Model (SAM)
+git+https://github.com/facebookresearch/segment-anything.git
+
+# Optional: Depth estimation (can be dynamically loaded from torch hub)
+# - transformers (for MiDaS, DPT)
+# - diffusers (for generative fallback)
+# - accelerate (for efficient inference)
+
+# Point cloud processing (for TSDF fusion)
+scipy>=1.11.0
+scikit-image>=0.21.0
+
