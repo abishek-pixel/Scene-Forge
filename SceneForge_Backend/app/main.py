@@ -8,44 +8,33 @@ from app.core.logger import setup_logging
 from app.core.config import settings
 import traceback
 import logging
+import os
 
 setup_logging()
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="SceneForge Backend API")
 
-# Configure CORS - MUST be added first, before other middleware
+# ===== CRITICAL: CORS Configuration (MUST be first) =====
+# Middleware executes in REVERSE order of addition, so add CORS first
+allowed_origins = [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://localhost:8000",
+    "https://scene-forge-7hi4yt9jy-abhishek-kamthes-projects.vercel.app",
+]
+
+logger.info(f"CORS Origins: {allowed_origins}")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",  # Local development
-        "http://localhost:5173",  # Vite dev
-        "https://scene-forge-app-abhishek-kamthes-projects.vercel.app",  # Old Vercel URL
-        "https://scene-forge-bfcuwj0tv-abhishek-kamthes-projects.vercel.app",  # Previous Vercel URL
-        "https://scene-forge-pfmmhe923-abhishek-kamthes-projects.vercel.app",  # Earlier Vercel URL
-        "https://scene-forge-7hi4yt9jy-abhishek-kamthes-projects.vercel.app",  # CURRENT Vercel URL
-        "http://localhost:8000",  # Local backend
-    ],
+    allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"],
-    allow_headers=["*"],  # Allow all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
     expose_headers=["*"],
-    max_age=3600,
 )
-
-# Add explicit OPTIONS handler for all routes (preflight)
-@app.options("/{full_path:path}")
-async def preflight_handler(request: Request, full_path: str):
-    return JSONResponse(
-        content={},
-        status_code=200,
-        headers={
-            "Access-Control-Allow-Origin": request.headers.get("origin", "*"),
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
-            "Access-Control-Allow-Headers": "*",
-            "Access-Control-Max-Age": "3600",
-        }
-    )
+# ===== END CORS Configuration =====
 
 # Global exception handler for 500 errors
 @app.exception_handler(Exception)
@@ -56,11 +45,8 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={
             "status": "error",
             "error": "Internal server error",
-            "message": str(exc)[:200],  # Limit message length
+            "message": str(exc)[:200],
             "path": str(request.url.path)
-        },
-        headers={
-            "Access-Control-Allow-Origin": request.headers.get("origin", "*"),
         }
     )
 
