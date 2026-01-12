@@ -16,23 +16,17 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="SceneForge Backend API")
 
 # ===== CRITICAL: CORS Configuration (MUST be first) =====
-# Middleware executes in REVERSE order of addition, so add CORS first
-allowed_origins = [
-    "http://localhost:3000",
-    "http://localhost:5173",
-    "http://localhost:8000",
-    "https://scene-forge-7hi4yt9jy-abhishek-kamthes-projects.vercel.app",
-]
-
-logger.info(f"CORS Origins: {allowed_origins}")
+# Allow all origins for testing
+logger.info("CORS: Allowing all origins for development/testing")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],
+    max_age=600,
 )
 # ===== END CORS Configuration =====
 
@@ -72,9 +66,6 @@ async def limit_upload_size(request: Request, call_next):
                 "status": "error",
                 "message": f"Request error: {str(e)[:100]}",
                 "error": "request_failed"
-            },
-            headers={
-                "Access-Control-Allow-Origin": request.headers.get("origin", "*"),
             }
         )
 
@@ -95,6 +86,30 @@ async def log_requests(request, call_next):
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+# DEBUG: Endpoint to check CORS and backend status
+@app.get("/debug/status")
+async def debug_status(request: Request):
+    from datetime import datetime
+    origin = request.headers.get('origin', 'no-origin')
+    return {
+        "status": "healthy",
+        "backend": "online",
+        "request_origin": origin,
+        "cors_enabled": True,
+        "timestamp": datetime.now().isoformat()
+    }
+
+# DEBUG: Simple test endpoint for CORS
+@app.post("/debug/test-cors")
+async def test_cors(request: Request):
+    from datetime import datetime
+    return {
+        "message": "CORS is working! POST request successful",
+        "method": "POST",
+        "origin": request.headers.get('origin', 'no-origin'),
+        "timestamp": datetime.now().isoformat()
+    }
 
 # Include API routers
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
