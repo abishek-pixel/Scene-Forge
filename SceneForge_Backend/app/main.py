@@ -1,8 +1,13 @@
-"""
-NOTE: This file is NOT used by Render.
-The actual entry point is SceneForge_Backend/main.py
-Keep this for reference only.
-"""
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from app.api import auth, scenes, processing
+import logging
+from datetime import datetime
+
+logger = logging.getLogger(__name__)
+
+app = FastAPI(title="SceneForge API")
 
 # ===== CRITICAL: CORS Configuration (MUST be first) =====
 # Allow all origins for testing
@@ -58,49 +63,35 @@ async def limit_upload_size(request: Request, call_next):
             }
         )
 
-# Request logging middleware
-@app.middleware("http")
-async def log_requests(request, call_next):
-    """Log all requests with error handling"""
-    try:
-        logger.info(f"Incoming: {request.method} {request.url.path}")
-        response = await call_next(request)
-        logger.info(f"Response: {response.status_code} {request.url.path}")
-        return response
-    except Exception as e:
-        logger.error(f"Request error on {request.url.path}: {str(e)}", exc_info=True)
-        raise
+# Include routers
+app.include_router(auth.router, prefix="/auth", tags=["auth"])
+app.include_router(scenes.router, prefix="/scenes", tags=["scenes"])
+app.include_router(processing.router, prefix="/processing", tags=["processing"])
 
-# Health check endpoint
+@app.get("/")
+async def root():
+    return {"message": "Welcome to FastAPI backend!"}
+
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
 
-# DEBUG: Endpoint to check CORS and backend status
+# DEBUG: Check CORS status
 @app.get("/debug/status")
 async def debug_status(request: Request):
-    from datetime import datetime
-    origin = request.headers.get('origin', 'no-origin')
     return {
         "status": "healthy",
         "backend": "online",
-        "request_origin": origin,
         "cors_enabled": True,
+        "request_origin": request.headers.get('origin', 'no-origin'),
         "timestamp": datetime.now().isoformat()
     }
 
-# DEBUG: Simple test endpoint for CORS
+# DEBUG: Test CORS with POST
 @app.post("/debug/test-cors")
 async def test_cors(request: Request):
-    from datetime import datetime
     return {
-        "message": "CORS is working! POST request successful",
-        "method": "POST",
+        "message": "CORS POST test successful!",
         "origin": request.headers.get('origin', 'no-origin'),
-        "timestamp": datetime.now().isoformat()
+        "method": "POST"
     }
-
-# Include API routers
-app.include_router(auth.router, prefix="/auth", tags=["auth"])
-app.include_router(scenes.router, prefix="/scenes", tags=["scenes"])
-app.include_router(processing.router, prefix="/processing", tags=["processing"])
